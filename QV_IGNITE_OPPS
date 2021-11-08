@@ -1,0 +1,82 @@
+
+  CREATE OR REPLACE FORCE EDITIONABLE VIEW "INSIGHTFACTORY"."QV_IGNITE_OPPS" ("SOURCE_DATE", "MACRO_SEGMENT", "MARKET", "MAIN_SALES_CHANNEL", "OPPORTUNITY_NAME", "OPPORTUNITY_REFERENCE_ID", "STAGE_UPDATE", "CLOSE_DATE", "CREATE_DATE", "AGE", "TERM", "CURRENCY_CODE", "COUNTRY", "ONE_GBP", "AOV", "TCV", "ONE_OFF_MARGIN", "ONE_OFF_COST", "ONE_OFF_REVENUE", "QUANTITY", "DM_SOURCE", "ACCOUNT_NAME", "OPP_TYPE", "PRODUCT_NAME", "TAXONOMY_ID", "WIN_CHANCE", "DELIVERY_DAYS", "START_BILL_DATE", "SEGMENT_CODE") AS 
+  with prod as (
+  select 
+  op.opportunityid, op.type_c, op.product_term_months_number_c as term, op.currencyisocode as currency_code, curr.country, curr.one_gbp, p2.product_name, p2.taxonomy_id,
+  round(sum(op.one_off_charge_margin_c /nvl(curr.one_gbp, 1)), 3) as one_off_margin,
+  round(sum(op.one_off_costs_c / nvl(curr.one_gbp, 1)), 3) as one_off_cost,
+  round(sum(op.product_aov_c / nvl(curr.one_gbp, 1)), 3) as aov,
+  round(sum(op.product_tcv_c / nvl(curr.one_gbp, 1)), 3) as tcv,
+  round(sum((nvl(op.one_off_costs_c, 0) + nvl(op.one_off_charge_margin_c, 0)) / nvl(curr.one_gbp, 1)), 3) as one_off_revenue,
+  round(sum(nvl(op.quantity, 0)), 3) as quantity
+  from 
+  ods_sfdc_opportunity_product op
+  left join qt_curr curr on curr.curr_code = op.currencyisocode
+  left join (select distinct product_id, fqpn_c as taxonomy_id, name as product_name from ods_sfdc_product) p2 on p2.product_id = op.product2
+  where 
+  op.type_c in ('New', 'Renewal') and op.status_c <> 'Invalid' and upper(op.isdeleted) <> 'T'
+  group by   
+  op.opportunityid, op.type_c, op.product_term_months_number_c, op.currencyisocode, curr.country, curr.one_gbp, p2.product_name , p2.taxonomy_id
+)
+select 
+opp.source_date,
+opp.macro_segment_c as macro_segment,
+opp.market_c as market,
+opp.main_sales_channel_c as main_sales_channel,
+opp.name as opportunity_name,
+opp.opportunity_reference_id_c as opportunity_reference_id,
+case
+  when opp.stagename = 'Implemented' then 'Closed Won'
+  else opp.stagename
+end as stage_update,
+opp.closedate as close_date,
+trunc(opp.createddate) as create_date,
+trunc(opp.closedate) - trunc(opp.createddate) as age,
+prod.term,
+prod.currency_code,
+prod.country,
+prod.one_gbp,
+nvl(prod.aov, 0) as aov,
+nvl(prod.tcv, 0) as tcv,
+nvl(prod.one_off_margin, 0) as one_off_margin,
+nvl(prod.one_off_cost, 0) as one_off_cost,
+nvl(prod.one_off_revenue, 0) as one_off_revenue,
+nvl(prod.quantity, 0) as quantity,
+acc.dm_source_c as dm_source,
+acc.account_name,
+prod.type_c as opp_type,
+prod.product_name,
+prod.taxonomy_id,
+case
+  when opp.stagename = 'Identify' then nvl(qprod.win_chance_identify, 0)
+  when opp.stagename = 'Qualify' then nvl(qprod.win_chance_qualify, 0)
+  when opp.stagename = 'Propose' then nvl(qprod.win_chance_propose, 0)
+  when opp.stagename = 'Negotiate' then nvl(qprod.win_chance_negotiate, 0)
+  when opp.stagename = 'Closed Won' then 1
+  when opp.stagename = 'Implemented' then 1
+  else 0 end
+as win_chance,
+qprod.delivery_days,
+case
+  when opp.stagename = 'Implemented' or opp.stagename like 'Close%' then opp.closedate
+  else greatest(opp.closedate, sysdate) end
+  + nvl(qprod.delivery_days, 30)
+as start_bill_date,
+case
+  when opp_mar.market is not null then opp_mar.segment_code
+  when opp_msc.main_sales_channel is not null then opp_msc.segment_code
+  else '!unmapped!' end
+as segment_code
+from
+ods_sfdc_opportunity opp
+left join (select distinct main_sales_channel_c, account_id, dm_source_c, name as account_name from ods_sfdc_account) acc on opp.accountid_sfdc = acc.account_id
+left join prod on opp.opportunity_id = prod.opportunityid
+left join qt_product qprod on lower(qprod.product_name) = lower(prod.product_name)
+left join qt_ignite_segment opp_mar on opp_mar.market = opp.market_c
+left join qt_ignite_segment opp_msc on opp_msc.main_sales_channel = opp.main_sales_channel_c
+where
+opp.country_c = 'United Kingdom'  -- delivery entity
+--and opp.closedate >= sysdate - 365*5+30 and opp.closedate <= sysdate + 365*5+30
+and opp.stagename in ('Identify', 'Qualify', 'Propose', 'Negotiate', 'Closed Won', 'Implemented', 'Closed No Deal', 'Closed Lost')
+and prod.type_c in ('New', 'Renewal')
+and (opp.opportunity_reference_id_c like 'O-%' or opp.opportunity_reference_id_c like 'OPP-%');
