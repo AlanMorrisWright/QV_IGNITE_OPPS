@@ -1,0 +1,3 @@
+-- opp ref is key
+select opportunity_reference_id_c, count(*) from ods_sfdc_opportunity group by opportunity_reference_id_c having count(*)>1;
+select opportunity_reference_id_c from ods_sfdc_opportunity where opportunity_reference_id_c is null;
