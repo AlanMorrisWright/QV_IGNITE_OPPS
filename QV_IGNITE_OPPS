@@ -27,8 +27,16 @@
     "WIN_CHANCE",
     "DELIVERY_DAYS",
     "START_BILL_DATE",
-    "SEGMENT_CODE") AS 
-  with prod as (
+    "SEGMENT_CODE") as 
+with prod_tax as (
+  select distinct
+  product_id,
+  fqpn_c as taxonomy_id,
+  name as product_name
+  from
+  ods_sfdc_product
+)
+,prod as (
   select 
   op.opportunityid,
   op.type_c,
@@ -36,8 +44,8 @@
   op.currencyisocode as currency_code,
   curr.country,
   curr.one_gbp,
-  p2.product_name,
-  p2.taxonomy_id,
+  pt.product_name,
+  pt.taxonomy_id,
   round(sum(op.one_off_charge_margin_c /nvl(curr.one_gbp, 1)), 3) as one_off_margin,
   round(sum(op.one_off_costs_c / nvl(curr.one_gbp, 1)), 3) as one_off_cost,
   round(sum(op.product_aov_c / nvl(curr.one_gbp, 1)), 3) as aov,
@@ -47,11 +55,11 @@
   from 
   ods_sfdc_opportunity_product op
   left join qt_curr curr on curr.curr_code = op.currencyisocode
-  left join (select distinct product_id, fqpn_c as taxonomy_id, name as product_name from ods_sfdc_product) p2 on p2.product_id = op.product2
+  left join prod_tax pt on pt.product_id = op.product2
   where 
   op.type_c in ('New', 'Renewal') and op.status_c <> 'Invalid' and upper(op.isdeleted) <> 'T'
   group by   
-  op.opportunityid, op.type_c, op.product_term_months_number_c, op.currencyisocode, curr.country, curr.one_gbp, p2.product_name , p2.taxonomy_id
+  op.opportunityid, op.type_c, op.product_term_months_number_c, op.currencyisocode, curr.country, curr.one_gbp, pt.product_name , pt.taxonomy_id
 )
 ,acc as (
   select distinct
