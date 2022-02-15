@@ -53,6 +53,15 @@
   group by   
   op.opportunityid, op.type_c, op.product_term_months_number_c, op.currencyisocode, curr.country, curr.one_gbp, p2.product_name , p2.taxonomy_id
 )
+,acc as (
+  select distinct
+  main_sales_channel_c,
+  account_id,
+  dm_source_c,
+  name as account_name
+  from
+  ods_sfdc_account
+) 
 select 
 opp.source_date,
 opp.macro_segment_c as macro_segment,
@@ -104,7 +113,7 @@ case
 as segment_code
 from
 ods_sfdc_opportunity opp
-left join (select distinct main_sales_channel_c, account_id, dm_source_c, name as account_name from ods_sfdc_account) acc on opp.accountid_sfdc = acc.account_id
+left join acc on opp.accountid_sfdc = acc.account_id
 left join prod on opp.opportunity_id = prod.opportunityid
 left join qt_product qprod on lower(qprod.product_name) = lower(prod.product_name)
 left join qt_ignite_segment opp_mar on opp_mar.market = opp.market_c
