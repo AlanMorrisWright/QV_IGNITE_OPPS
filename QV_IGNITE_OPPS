@@ -93,14 +93,15 @@ left join qt_ignite_segment opp_msc on opp_msc.main_sales_channel = opp.main_sal
 select 
 opp.source_date,
 opp.opportunity_reference_id_c as opportunity_reference_id,
+nvl(opp.country_c, '!!null') as opp_country,
 opp.macro_segment_c as macro_segment,
 opp.market_c as market,
 opp.main_sales_channel_c as main_sales_channel,
 opp.name as opportunity_name,
 case
   when opp.stagename = 'Implemented' then 'Closed Won'
-  else opp.stagename
-end as opp_stage_update,
+  else nvl(opp.stagename, '!!null')
+end as opp_stage,
 opp.closedate as close_date,
 trunc(opp.createddate) as create_date,
 trunc(opp.closedate) - trunc(opp.createddate) as lifespan,
@@ -110,7 +111,6 @@ acc.account_name,
 
 prod.term,
 prod.currency_code,
-prod.country,
 prod.one_gbp,
 nvl(prod.aov, 0) as aov,
 nvl(prod.tcv, 0) as tcv,
