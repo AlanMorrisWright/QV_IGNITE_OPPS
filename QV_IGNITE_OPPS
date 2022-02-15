@@ -69,18 +69,31 @@ with prod_tax as (
   name as account_name
   from
   ods_sfdc_account
-) 
+)
+,opp_seg as (
+select distinct
+opp.opportunity_reference_id_c,
+case
+  when opp_mar.market is not null then opp_mar.segment_code
+  when opp_msc.main_sales_channel is not null then opp_msc.segment_code
+  else '!unmapped!' end
+as segment_code
+from
+ods_sfdc_opportunity opp
+left join qt_ignite_segment opp_mar on opp_mar.market = opp.market_c
+left join qt_ignite_segment opp_msc on opp_msc.main_sales_channel = opp.main_sales_channel_c
+)
 select 
 opp.source_date,
+opp.opportunity_reference_id_c as opportunity_reference_id,
 opp.macro_segment_c as macro_segment,
 opp.market_c as market,
 opp.main_sales_channel_c as main_sales_channel,
 opp.name as opportunity_name,
-opp.opportunity_reference_id_c as opportunity_reference_id,
 case
   when opp.stagename = 'Implemented' then 'Closed Won'
   else opp.stagename
-end as stage_update,
+end as opp_stage_update,
 opp.closedate as close_date,
 trunc(opp.createddate) as create_date,
 trunc(opp.closedate) - trunc(opp.createddate) as age,
@@ -113,19 +126,13 @@ case
   when opp.stagename = 'Implemented' or opp.stagename like 'Close%' then opp.closedate
   else greatest(opp.closedate, sysdate) end
   + nvl(qprod.delivery_days, 30)
-as start_bill_date,
-case
-  when opp_mar.market is not null then opp_mar.segment_code
-  when opp_msc.main_sales_channel is not null then opp_msc.segment_code
-  else '!unmapped!' end
-as segment_code
+as start_bill_date
 from
 ods_sfdc_opportunity opp
 left join acc on opp.accountid_sfdc = acc.account_id
 left join prod on opp.opportunity_id = prod.opportunityid
+left join opp_seg os on os.opportunity_reference_id_c = opp.opportunity_reference_id_c
 left join qt_product qprod on lower(qprod.product_name) = lower(prod.product_name)
-left join qt_ignite_segment opp_mar on opp_mar.market = opp.market_c
-left join qt_ignite_segment opp_msc on opp_msc.main_sales_channel = opp.main_sales_channel_c
 where
 opp.country_c = 'United Kingdom'  -- delivery entity
 --and opp.closedate >= sysdate - 365*5+30 and opp.closedate <= sysdate + 365*5+30
