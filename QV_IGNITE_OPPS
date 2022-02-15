@@ -57,7 +57,7 @@ with prod_tax as (
   left join qt_curr curr on curr.curr_code = op.currencyisocode
   left join prod_tax pt on pt.product_id = op.product2
   where 
-  op.type_c in ('New', 'Renewal') and op.status_c <> 'Invalid' and upper(op.isdeleted) <> 'T'
+  op.status_c <> 'Invalid' and upper(op.isdeleted) <> 'T'
   group by   
   op.opportunityid, op.type_c, op.product_term_months_number_c, op.currencyisocode, curr.country, curr.one_gbp, pt.product_name , pt.taxonomy_id
 )
