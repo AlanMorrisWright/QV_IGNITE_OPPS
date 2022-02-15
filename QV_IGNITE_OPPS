@@ -144,7 +144,5 @@ left join prod on opp.opportunity_id = prod.opportunityid
 left join opp_seg os on os.opportunity_reference_id_c = opp.opportunity_reference_id_c
 left join qt_product qprod on lower(qprod.product_name) = lower(prod.product_name)
 where
-opp.country_c = 'United Kingdom'  -- delivery entity
-and opp.stagename in ('Identify', 'Qualify', 'Propose', 'Negotiate', 'Closed Won', 'Implemented', 'Closed No Deal', 'Closed Lost')
-and prod.type_c in ('New', 'Renewal')
+opp.stagename in ('Identify', 'Qualify', 'Propose', 'Negotiate', 'Closed Won', 'Implemented', 'Closed No Deal', 'Closed Lost', 'Invalid')
 and (opp.opportunity_reference_id_c like 'O-%' or opp.opportunity_reference_id_c like 'OPP-%');

@@ -44,4 +44,5 @@ select
 notes
 'Closed Moved', 'Create', 'Entered in Error' & 'Pre-Qualified' can be ignored as mostly used 2015/2016, some in 2014, 2017-18
 only 13% of 'closed won' and 'implemented' are 'implemented' - therefore class both these as 'closed won'
+stagename is never null
 */
